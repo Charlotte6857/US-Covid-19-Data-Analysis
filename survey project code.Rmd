@@ -1,0 +1,202 @@
+---
+title: "survey project"
+author: "Jessie Chen"
+date: "12/10/2022"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+# getwd()
+# setwd('/Users/jessiechen/Desktop/NYU')
+finaldata<-read.csv("final data.csv")
+#View(finaldata)
+#change column name so it is easier to read
+da<-finaldata
+colnames(da)<-paste("Q", 1:dim(finaldata)[2], sep="")
+#View(da)
+#1 get a Basic Descriptive Statistics
+summary(finaldata)
+ave1<-colMeans(da)
+ave1
+#View(ave1)
+# Q1   Q2   Q3   Q4   Q5   Q6   Q7   Q8   Q9  Q10  Q11 
+# 3.44 3.52 2.80 3.20 3.68 3.20 2.92 3.56 3.80 3.64 3.32 
+hist(ave1, main="average respond for each answer",
+xlab="questions"
+)
+# 1- strongly disagree 2- somewhat disagree 3- neither agree or disagree 4- somewhat agree 5- strongly agree
+# 2. use cohen's alpha to check data consistency
+#install.packages("ltm")
+library(ltm)
+library(psych)
+alpha(da)
+#   1    2    3    4    5 miss
+# Q1  0.12 0.12 0.16 0.40 0.20    0
+# Q2  0.08 0.08 0.24 0.44 0.16    0
+# Q3  0.08 0.40 0.24 0.20 0.08    0
+# Q4  0.16 0.20 0.16 0.24 0.24    0
+# Q5  0.12 0.16 0.08 0.20 0.44    0
+# Q6  0.16 0.16 0.16 0.36 0.16    0
+# Q7  0.08 0.32 0.32 0.16 0.12    0
+# Q8  0.04 0.16 0.24 0.32 0.24    0
+# Q9  0.12 0.08 0.08 0.32 0.40    0
+# Q10 0.04 0.12 0.20 0.44 0.20    0
+# Q11 0.04 0.24 0.24 0.32 0.16    0
+cronbach.alpha(da)
+# alpha: 0.872, there is a high consistency among questions
+#use split half to check reliability
+#install.packages("performance")
+library(performance)
+item_split_half(da)
+
+#split half function
+item_split_half <- function(x, digits = 3) {
+  # Calculating total score for even items
+  score_e <- rowMeans(x[, c(TRUE, FALSE), drop = FALSE], na.rm = TRUE)
+  # Calculating total score for odd items
+  score_o <- rowMeans(x[, c(FALSE, TRUE), drop = FALSE], na.rm = TRUE)
+
+  # Correlating scores from even and odd items
+  shr <- stats::cor(score_e, score_o, use = "complete.obs")
+
+  # Adjusting with the Spearman-Brown prophecy formula
+  sb.shr <- (2 * shr) / (1 + shr)
+
+  list(splithalf = shr, spearmanbrown = sb.shr)
+}
+print(item_split_half(da))
+item_split_half(da)
+#3 Use KMO to check is it fit for a factor analysis
+KMO(finaldata)
+# Overall MSA =  0.63, which is >than 0.5, and it is ok to perform factor analysis
+# use Bartlett test for correlation to check if there is correlation, therefore it will be necessary to perform factor analysis. If there is correlation between items, it is meaningful to do factor analysis
+cortest.bartlett(cor(finaldata))
+#  P=4.197954e-152 which is significant, therefore there is a correlation and we should perform factor analysis
+
+#correlation matrix
+#install.packages("Hmisc")
+library("Hmisc")
+mydata.rcorr = rcorr(as.matrix(da))
+mydata.rcorr
+#install.packages("corrplot")
+library(corrplot)
+mydata.cor = cor(da)
+palette = colorRampPalette(c("green", "white", "red")) (20)
+heatmap(x = mydata.cor, col = palette, symm = TRUE)
+
+
+
+# 4. factor analysis
+# 	a. determine number of factors, using eigenvalues, parallel analysis, or scree test
+
+# get eigenvalues
+ev <- eigen(cor(finaldata)) 
+ev$values
+ # [1] 5.08812400 2.35718290 1.07814124 0.73406381 0.56897389 0.36014567 0.29258613 0.23164335
+ # [9] 0.16748124 0.07520888 0.04644888
+pca<- prcomp(cor(finaldata))
+pca$sdev
+sumev<-cumsum(ev$values/sum(ev$values))
+sumev
+#  [1] 0.4625567 0.6768461 0.7748589 0.8415920 0.8933169 0.9260574 0.9526562 0.9737146 0.9889402
+# [10] 0.9957774 1.0000000
+# according to the result, up to 80% of the variance can be explain by 4 factors.
+
+
+# you can also use scree plot to check for factor number
+scree(finaldata, pc=FALSE) 
+
+#Or You can check this using a parallel analysis.
+fa.parallel(finaldata, fa="fa")
+
+#the plot suggest that we use 2 or 3 factors, and we can try to check using factor = 2 and factor = 3.
+
+
+
+#factor analysis
+#we also need to assume whether the factor is independent or not, here we assume it is independent, therefore we use rotation=varimax
+Nfacs <- 2
+fit2 <- factanal(da, Nfacs, rotation="varimax")
+print(fit2, digits=2, cutoff=0.3, sort=TRUE)
+
+Nfacs <- 3
+fit3 <- factanal(da, Nfacs, rotation="varimax")
+print(fit3, digits=2, cutoff=0.3, sort=TRUE)
+
+Nfacs <- 4
+fit4 <- factanal(da, Nfacs, rotation="varimax")
+print(fit4, digits=2, cutoff=0.3, sort=TRUE)
+
+#residual calculation
+# lambda<-fit2$loadings
+# ps1<-diag(fit2$uniquenesses)
+# s<-fit2$correlation
+# sigma2<-lambda % % t(lambda)+ps1
+# res2<-round(s-sigma2, 4)
+
+
+
+# #c. result:
+# 		uniqueness: variance not explained by factors; lower is better
+# 		Loadings: correlation between factors and original questions
+# 		p-value: > 0.05 means the model is ok
+
+#check loading and diagram of factor analysis when factor number = 2,3,4
+loads2 <- fit2$loadings
+loads2
+
+fa.diagram(loads2)
+
+loads3 <- fit3$loadings
+loads3
+
+fa.diagram(loads3)
+
+loads4 <- fit4$loadings
+loads4
+
+fa.diagram(loads4)
+
+# d. does the factor analysis make sense?
+# 		check cohen's alpha again
+#factor 1 Q4-7
+cronbach.alpha(da[,4:7])
+#0.87
+
+#factor 2  Q1-3
+cronbach.alpha(da[,1:3])
+#0.87
+
+# factor 3 Q8-9
+cronbach.alpha(da[,8:9])
+#0.73
+
+#factor 4 Q10-11
+cronbach.alpha(da[,10:11])
+#0.85
+
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
